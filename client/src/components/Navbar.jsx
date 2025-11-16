@@ -51,9 +51,9 @@ bg-clip-text text-transparent"
 
           {/* Desktop nav */}
           <nav className="hidden lg:flex items-center gap-1">
-            <NavLink href="#discover">Discover Tours</NavLink>
-            <NavLink href="#events">Events</NavLink>
-            <NavLink href="#about">About</NavLink>
+            <NavLink href="/tours">Discover Tours</NavLink>
+            <NavLink href="/events">Events</NavLink>
+            <NavLink href="/about">About</NavLink>
           </nav>
 
           {/* Desktop actions */}
