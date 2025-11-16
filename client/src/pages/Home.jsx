@@ -2,6 +2,12 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Hero from "../components/Hero";
+import HowCeylonConnectWorks from "../components/section/HowCeyloneConnectWork";
+import FeaturedExperiences from "../components/section/FeaturedExperiences";
+import TravelWithConfidence from "../components/section/TravelWithConfidence";
+import UpcomingEvents from "../components/section/UpComingEvents";
+import ExploreCTA from "../components/section/ExploreCTA";
+import Footer from "../components/Footer";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -16,6 +22,12 @@ export default function Home() {
       />
       <main>
         <Hero />
+        <HowCeylonConnectWorks />
+         <FeaturedExperiences showPagination={false} limit={6} />
+         <TravelWithConfidence />
+         <UpcomingEvents showPagination={false} limit={2} />
+         <ExploreCTA />
+         <Footer />
       </main>
     </>
   );

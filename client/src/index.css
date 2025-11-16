@@ -7,3 +7,18 @@
 *{
      font-family: "Outfit", sans-serif;
 }
+
+@layer components {
+  .footer-link {
+    transition:
+      color .3s,
+      transform .3s,
+      background-position .6s;
+  }
+  .footer-link:hover {
+    transform: translateY(-2px);
+  }
+  .footer-link:active {
+    transform: translateY(0);
+  }
+}
