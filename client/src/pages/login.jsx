@@ -1,20 +1,56 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import FloatingInput from "../components/FloatingInput";
+import http from "../lib/http"; // axios instance
+import { toast } from "react-toastify";
+import { useAuth } from "../state/AuthContext";
 
 export default function LoginPage() {
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const next = params.get("next") || "";
+  const { user: authUser, setUser } = useAuth();
+
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+
+  // If user already logged in, bounce away from /login
+  useEffect(() => {
+    if (authUser) {
+      navigate(next || "/dashboard", { replace: true });
+    } else {
+      // If a token exists but authUser not set yet, you might fetch /users/me in AuthProvider.
+      const token = localStorage.getItem("token") || localStorage.getItem("access_token");
+      if (token) {
+        // Conservative redirect (optional). If your AuthProvider fetches /users/me on boot, it will hydrate soon.
+        navigate(next || "/dashboard", { replace: true });
+      }
+    }
+  }, [authUser, next, navigate]);
+
   const handleChange = (e) =>
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
   function validate() {
-    const next = {};
-    if (!form.email.match(/^[^@]+@[^@]+\.[^@]+$/))
-      next.email = "Valid email required";
-    if (form.password.length < 6) next.password = "Min 6 characters";
-    return next;
+    const nextErr = {};
+    if (!/^[^@]+@[^@]+\.[^@]+$/.test(form.email)) nextErr.email = "Valid email required";
+    if (form.password.length < 6) nextErr.password = "Min 6 characters";
+    return nextErr;
+  }
+
+  function normalizeUser(u = {}) {
+    return {
+      id: u.id || u._id || u.user_id || "u_me",
+      firstName: u.firstName || u.first_name || "",
+      lastName: u.lastName || u.last_name || "",
+      email: u.email || "",
+      phone: u.phone || u.phone_number || "",
+      avatar: u.avatar || u.avatarUrl || u.avatar_url || u.photo || "",
+      role: u.role || "tourist",
+      createdAt: u.createdAt,
+    };
   }
 
   async function onSubmit(e) {
@@ -22,39 +58,72 @@ export default function LoginPage() {
     const v = validate();
     setErrors(v);
     if (Object.keys(v).length) return;
+
     setLoading(true);
-    // Fake async
-    await new Promise((r) => setTimeout(r, 1800));
-    setLoading(false);
-    alert("Signed in!");
+    try {
+      const res = await http.post("/users/login", {
+        email: form.email,
+        password: form.password,
+      });
+
+      const data = res?.data || {};
+      const token = data.token || data.accessToken || data.access_token || data.jwt;
+      const rawUser = data.user || data.profile || {};
+      const normalized = normalizeUser(rawUser);
+      const role = normalized.role?.toLowerCase?.() || (data.role || "tourist");
+
+      if (!token) throw new Error("Login failed: token missing");
+
+      // persist
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(normalized));
+
+      // update context so Dashboard immediately sees the user
+      setUser(normalized);
+
+      toast.success("Logged in successfully");
+
+      // Navigate immediately (no setTimeout)
+      if (next) {
+        navigate(next, { replace: true });
+      } else if (role === "guide" || role === "local") {
+        navigate("/local", { replace: true });
+      } else {
+        navigate("/dashboard", { replace: true });
+      }
+    } catch (err) {
+      console.error(err);
+      const message =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err.message ||
+        "Invalid email or password";
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <div className="relative min-h-screen flex flex-col items-center px-4 py-10 sm:py-16 overflow-hidden bg-[radial-gradient(circle_at_30%_20%,#fff7ec,transparent_60%)] dark:bg-white">
-
-      <div
+    <div className="relative min-h-screen flex flex-col items-center px-4 py-10 sm:py-16 overflow-hidden bg-[radial-gradient(circle_at_30%_20%,#fff7ec,transparent_60%)]">
+      {/* Brand */}
+      <a
+        href="/"
         className="text-2xl sm:text-4xl font-extrabold mb-4 sm:mb-2 select-none 
-bg-gradient-to-r from-orange-600 via-yellow-500 to-teal-600 
-bg-clip-text text-transparent"
+        bg-gradient-to-r from-orange-600 via-yellow-500 to-teal-600 
+        bg-clip-text text-transparent"
       >
-        CeyloneConnect
-      </div>
+        CeylonConnect
+      </a>
 
-      <div
-        className="mx-auto mt-10 w-full max-w-md rounded-3xl bg-white/90 dark:bg-neutral-900 backdrop-blur-md
-          p-8 sm:p-10 shadow-[0_8px_40px_-8px_rgba(0,0,0,0.12)] ring-1 ring-neutral-200/70 dark:ring-neutral-800
-          animate-scale-in"
-      >
+      {/* Card */}
+      <div className="mx-auto mt-8 w-full max-w-md rounded-3xl bg-white/90 backdrop-blur-md p-8 sm:p-10 shadow-[0_8px_40px_-8px_rgba(0,0,0,0.12)] ring-1 ring-neutral-200">
         <div className="text-center space-y-2">
-          <h1 className="text-3xl sm:text-4xl font-semibold text-neutral-800 dark:text-neutral-100">
-            Welcome Back
-          </h1>
-          <p className="text-neutral-500 dark:text-neutral-400 text-sm">
-            Sign in to your account to continue
-          </p>
+          <h1 className="text-3xl sm:text-4xl font-semibold text-neutral-800">Welcome Back</h1>
+          <p className="text-neutral-500 text-sm">Sign in to your account to continue</p>
         </div>
 
-        <form onSubmit={onSubmit} className="mt-10 space-y-6">
+        <form onSubmit={onSubmit} className="mt-8 space-y-6">
           <FloatingInput
             label="Email"
             name="email"
@@ -85,9 +154,13 @@ bg-clip-text text-transparent"
             </button>
           </div>
 
-          <div className="flex justify-end -mt-3">
+        <div className="flex items-center justify-between -mt-1">
+            <label className="flex items-center gap-2 text-sm text-neutral-600">
+              <input type="checkbox" className="h-4 w-4 rounded border-neutral-300 text-orange-600 focus:ring-orange-400" />
+              Remember me
+            </label>
             <a
-              href="#"
+              href="/forgot-password"
               className="text-sm font-medium bg-gradient-to-r from-orange-600 to-teal-600 bg-clip-text text-transparent hover:underline"
             >
               Forgot password?
@@ -98,35 +171,26 @@ bg-clip-text text-transparent"
             type="submit"
             disabled={loading}
             className="relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-orange-500 via-orange-400 to-yellow-400
-                font-semibold text-white shadow-md shadow-orange-300/40
-                transition-all duration-500 hover:shadow-xl hover:brightness-105 focus:outline-none focus:ring-4 focus:ring-orange-200
-                active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 animate-gradient-x"
+              font-semibold text-white shadow-md shadow-orange-300/40 transition-all duration-500
+              hover:shadow-xl hover:brightness-105 focus:outline-none focus:ring-4 focus:ring-orange-200
+              active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
           >
             <span
-              className={`flex items-center justify-center gap-2 py-3 text-sm tracking-wide ${
-                loading ? "opacity-0" : "opacity-100"
-              }`}
+              className={`flex items-center justify-center gap-2 py-3 text-sm tracking-wide ${loading ? "opacity-0" : "opacity-100"}`}
             >
               Sign In
             </span>
 
-            {/* Loading overlay */}
             {loading && (
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <div className="h-5 w-5 border-2 border-white/70 border-t-transparent rounded-full animate-spin" />
-                <div className="mt-3 h-1 w-4/5 overflow-hidden rounded-full bg-white/30">
-                  <div className="h-full w-1/3 animate-loading-bar rounded-full bg-white"></div>
-                </div>
               </div>
             )}
-
-            {/* Button animated shine */}
-            <div className="pointer-events-none absolute inset-0 before:absolute before:inset-0 before:-translate-x-full before:animate-shine before:bg-gradient-to-r before:from-transparent before:via-white/70 before:to-transparent"></div>
           </button>
         </form>
 
-        <p className="mt-8 text-center text-neutral-600 dark:text-neutral-400 text-sm">
-          Don't have an account?{" "}
+        <p className="mt-8 text-center text-neutral-600 text-sm">
+          Don&apos;t have an account?{" "}
           <a
             href="/signup"
             className="font-semibold bg-gradient-to-r from-orange-600 via-yellow-500 to-teal-600 bg-clip-text text-transparent hover:underline"

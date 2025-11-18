@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Navbar from "../components/Navbar";
-import { useAuth } from "../state/AuthContext";
 import { useBooking } from "../state/BookingContext";
 import BookingItem from "../components/dashboard/BookingItem";
 import ChatPanel from "../components/dashboard/ChatPanel";
 import { useLocation, useNavigate } from "react-router-dom";
+import Avatar from "../components/ui/avatar";
+import { useAuth } from "../state/AuthContext";
 
 function StatCard({ label, value }) {
   return (
@@ -16,14 +17,35 @@ function StatCard({ label, value }) {
 }
 
 export default function Dashboard() {
-  const { user, loginAsDemo, setUser } = useAuth();
-  const { bookings, updateBookingStatus } = useBooking();
-  const [tab, setTab] = useState("bookings"); // bookings | messages | profile
+  const {
+    bookings,
+    updateBookingStatus,
+    loadBookings,
+    loading: bookingsLoading,
+    error: bookingsError,
+  } = useBooking();
+  const [tab, setTab] = useState("bookings");
+  const { user, setUser, initializing } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Banner if redirected after booking
+  // Read banner param
   const justBooked = new URLSearchParams(location.search).get("booking");
+
+  useEffect(() => {
+    if (!initializing && !user) {
+      navigate(`/login?next=${encodeURIComponent("/dashboard")}`, {
+        replace: true,
+      });
+    }
+  }, [initializing, user, navigate]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    loadBookings({ userId: user.id, role: "tourist" }).catch(() => {
+      /* errors handled in context */
+    });
+  }, [user?.id, loadBookings]);
 
   const stats = useMemo(() => {
     const total = bookings.length;
@@ -32,35 +54,16 @@ export default function Dashboard() {
     return { total, upcoming, spent };
   }, [bookings]);
 
-  if (!user) {
+
+  if (initializing || !user) {
     return (
       <>
         <Navbar />
-        <div className="mx-auto max-w-3xl px-4 py-16 text-center">
-          <img
-            src="https://i.pravatar.cc/120?img=22"
-            className="mx-auto mb-4 h-16 w-16 rounded-full"
-            alt=""
-          />
-          <h1 className="text-2xl font-bold text-neutral-900">Welcome!</h1>
-          <p className="mt-2 text-neutral-600">
-            Please login to view your bookings, messages, and profile.
-          </p>
-          <div className="mt-6 flex items-center justify-center gap-3">
-            <a
-              href="/login?next=/dashboard"
-              className="rounded-xl bg-neutral-900 px-4 py-2 text-sm font-semibold text-white"
-            >
-              Login
-            </a>
-            <button
-              onClick={loginAsDemo}
-              className="rounded-xl border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
-            >
-              Use demo account
-            </button>
-          </div>
-        </div>
+        <main className="bg-sand-50">
+          <section className="mx-auto max-w-6xl px-4 py-16 text-center text-neutral-600">
+            {initializing ? "Loading your dashboard..." : "Redirecting to login..."}
+          </section>
+        </main>
       </>
     );
   }
@@ -70,11 +73,18 @@ export default function Dashboard() {
       <Navbar />
       <main className="bg-sand-50">
         <section className="mx-auto max-w-6xl px-4 py-8">
+          {/* Header */}
           <div className="flex items-center gap-4">
-            <img src={user.avatar} className="h-14 w-14 rounded-full object-cover" alt="" />
+            <Avatar
+              src={user.avatar}
+              name={`${user.firstName || ""} ${user.lastName || ""}`.trim()}
+              email={user.email}
+              size={56}
+              className="ring-2 ring-white shadow"
+            />
             <div>
               <h1 className="text-3xl font-extrabold text-neutral-900">
-                Welcome back, {user.firstName}!
+                Welcome back, {user.firstName || "Traveler"}!
               </h1>
               <p className="text-neutral-600">Manage your bookings and profile</p>
             </div>
@@ -121,11 +131,22 @@ export default function Dashboard() {
 
               <h2 className="mt-8 text-2xl font-extrabold text-neutral-900">Your Bookings</h2>
               <div className="mt-4 space-y-4">
-                {bookings.length === 0 ? (
+                {bookingsLoading && (
+                  <div className="rounded-2xl border border-neutral-200 bg-white p-8 text-center text-neutral-600">
+                    Loading bookings...
+                  </div>
+                )}
+                {!bookingsLoading && bookingsError && (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    {bookingsError}
+                  </div>
+                )}
+                {!bookingsLoading && bookings.length === 0 && !bookingsError && (
                   <div className="rounded-2xl border border-neutral-200 bg-white p-8 text-center text-neutral-600">
                     You have no bookings yet.
                   </div>
-                ) : (
+                )}
+                {!bookingsLoading &&
                   bookings.map((b) => (
                     <BookingItem
                       key={b.id}
@@ -136,8 +157,7 @@ export default function Dashboard() {
                         navigate(`/dashboard?chat=${bkg.guide.id}`, { replace: true });
                       }}
                     />
-                  ))
-                )}
+                  ))}
               </div>
             </>
           )}
@@ -160,13 +180,13 @@ export default function Dashboard() {
                   className="mt-4 space-y-4"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    const form = new FormData(e.currentTarget);
+                    const fd = new FormData(e.currentTarget);
                     setUser((u) => ({
                       ...u,
-                      firstName: form.get("firstName"),
-                      lastName: form.get("lastName"),
-                      email: form.get("email"),
-                      phone: form.get("phone"),
+                      firstName: fd.get("firstName"),
+                      lastName: fd.get("lastName"),
+                      email: fd.get("email"),
+                      phone: fd.get("phone"),
                     }));
                     alert("Profile updated!");
                   }}

@@ -1,49 +1,61 @@
-import React, { useState, useId } from "react";
+import React from "react";
 
 export default function FloatingInput({
   label,
-  type = "text",
   name,
-  autoComplete,
-  className = "",
-  onChange,
   value,
+  onChange,
+  type = "text",
   error,
+  className = "",
+  autoComplete,
+  ...rest
 }) {
-  const [focused, setFocused] = useState(false);
-  const id = useId();
-  const isActive = focused || (value ?? "").length > 0;
-
   return (
-    <div className={`group relative ${className}`}>
+    <div className="floating-field">
       <div
-        className={`rounded-xl transition-all duration-300 border bg-white/80 backdrop-blur-sm
-          ${error ? "border-red-400 shadow-[0_0_0_3px_rgba(248,113,113,0.35)] animate-shake" : "border-neutral-200 shadow-sm hover:shadow-md focus-within:shadow-lg focus-within:border-transparent focus-within:ring-2 focus-within:ring-orange-400/50"}
-        `}
+        className={[
+          "relative",
+          error ? "floating-error" : "",
+        ].join(" ")}
       >
+        {/* Use placeholder=' ' to enable peer-placeholder-shown */}
         <input
-          id={id}
-            name={name}
-            type={type}
-            autoComplete={autoComplete}
-            value={value}
-            onChange={onChange}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            placeholder="" /* real placeholder hidden for floating label */
-            className="peer w-full bg-transparent px-4 pt-5 pb-2 text-[15px] text-neutral-800 outline-none placeholder-transparent"
+          id={name}
+          name={name}
+          type={type}
+          autoComplete={autoComplete}
+          value={value}
+          onChange={onChange}
+          placeholder=" "
+          className={[
+            "peer block w-full h-12 rounded-xl border px-3 pt-3 text-sm text-neutral-900",
+            "bg-white outline-none transition",
+            "border-neutral-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-400/30",
+            "autofill:shadow-[inset_0_0_0px_1000px_#fff] autofill:text-neutral-900", // for modern Tailwind w/ plugin
+            className,
+          ].join(" ")}
+          {...rest}
         />
+
         <label
-          htmlFor={id}
-          className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500 transition-all duration-300
-            ${isActive ? "top-2 text-[11px] font-medium tracking-wide text-neutral-600" : "text-sm"}
-            peer-focus:top-2 peer-focus:text-[11px] peer-focus:font-medium peer-focus:tracking-wide peer-focus:text-neutral-600
-          `}
+          htmlFor={name}
+          className={[
+            "pointer-events-none absolute left-3 top-1/2 -translate-y-1/2",
+            "bg-white px-1 text-[13px] text-neutral-500 transition-all",
+            // Float on focus or when there's value (not placeholder-shown)
+            "peer-focus:-top-2 peer-focus:translate-y-0 peer-focus:scale-90 peer-focus:text-orange-600",
+            "peer-[&:not(:placeholder-shown)]:-top-2 peer-[&:not(:placeholder-shown)]:translate-y-0 peer-[&:not(:placeholder-shown)]:scale-90",
+            // Also float when autofilled (handled by CSS in index.css)
+          ].join(" ")}
         >
           {label}
         </label>
       </div>
-      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+
+      {error && (
+        <p className="mt-1 text-xs font-medium text-rose-600">{error}</p>
+      )}
     </div>
   );
 }
