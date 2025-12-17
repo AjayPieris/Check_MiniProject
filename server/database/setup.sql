@@ -105,6 +105,19 @@ CREATE TABLE IF NOT EXISTS events (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 );
 
+CREATE TABLE IF NOT EXISTS notifications (
+    notification_id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(user_id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT,
+    link VARCHAR(255),
+    metadata TEXT,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    read_at TIMESTAMP
+);
+
 -- Insert sample data
 INSERT INTO users (email, password_hash, first_name, last_name, phone, role, badge_status) VALUES
 ('admin@ceylonconnect.com', '$2a$10$N9qo8uLOickgx2ZMRZoMye.Ks7p8b9.ZuPkpcB7dJIgSQYWE6dL0a', 'Admin', 'User', '0771234567', 'admin', 'verified'),

@@ -7,11 +7,16 @@ import {
   getGuideAverageRating,
   getReviewStats,
 } from "../controllers/reviewController.js";
+import {
+  protect,
+  requireRole,
+  requireAdmin,
+} from "../../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// ✅ Create a new review
-router.post("/", createReview);
+// ✅ Create a new review (tourist only)
+router.post("/", protect, requireRole("tourist"), createReview);
 
 // ✅ Get all reviews for a specific tour
 router.get("/tour/:tourId", getReviewsByTour);
@@ -26,6 +31,6 @@ router.get("/tour/:tourId/average", getAverageRating);
 router.get("/guide/:guideId/average", getGuideAverageRating);
 
 // ✅ Get overall platform review stats (Admin)
-router.get("/stats/overview", getReviewStats);
+router.get("/stats/overview", protect, requireAdmin, getReviewStats);
 
 export default router;

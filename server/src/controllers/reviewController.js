@@ -3,8 +3,19 @@ import Review from "../models/reviewModel.js";
 // ✅ Create a new review
 export const createReview = async (req, res) => {
   try {
-    const reviewData = req.body;
-    const newReview = await Review.create(reviewData);
+    const touristId = req.user?.user_id;
+    if (!touristId) return res.status(401).json({ error: "Unauthorized" });
+
+    const { tour_id, tourId, booking_id, bookingId, rating, comment } =
+      req.body || {};
+
+    const newReview = await Review.create({
+      tourist_id: touristId,
+      tour_id: tour_id ?? tourId,
+      booking_id: booking_id ?? bookingId,
+      rating,
+      comment,
+    });
     res.status(201).json(newReview);
   } catch (error) {
     console.error("Error creating review:", error.message);
@@ -41,7 +52,11 @@ export const getAverageRating = async (req, res) => {
   try {
     const { tourId } = req.params;
     const stats = await Review.getAverageRating(tourId);
-    res.status(200).json(stats);
+    res.status(200).json({
+      ...stats,
+      average: Number(stats?.average_rating || 0),
+      total: Number(stats?.total_reviews || 0),
+    });
   } catch (error) {
     console.error("Error fetching average rating:", error);
     res.status(500).json({ error: "Failed to fetch average rating" });
@@ -53,7 +68,11 @@ export const getGuideAverageRating = async (req, res) => {
   try {
     const { guideId } = req.params;
     const stats = await Review.getGuideAverageRating(guideId);
-    res.status(200).json(stats);
+    res.status(200).json({
+      ...stats,
+      average: Number(stats?.average_rating || 0),
+      total: Number(stats?.total_reviews || 0),
+    });
   } catch (error) {
     console.error("Error fetching guide average rating:", error);
     res.status(500).json({ error: "Failed to fetch guide rating" });

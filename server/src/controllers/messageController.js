@@ -1,10 +1,90 @@
 import Message from "../models/messageModel.js";
+import pusher from "../config/pusher.js";
+import Notification from "../models/notificationModel.js";
+import User from "../models/userModel.js";
+
+function toConversationId(userA, userB) {
+  const a = Number(userA);
+  const b = Number(userB);
+  const parts = [a, b].sort((x, y) => x - y);
+  return `${parts[0]}_${parts[1]}`;
+}
 
 // ✅ Send a new message
 export const sendMessage = async (req, res) => {
   try {
-    const messageData = req.body;
+    const senderId = Number(req.user?.user_id);
+    if (!Number.isFinite(senderId)) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const receiverId = Number(req.body?.receiver_id ?? req.body?.receiverId);
+    if (!Number.isFinite(receiverId)) {
+      return res.status(400).json({ error: "Invalid receiver_id" });
+    }
+    if (receiverId === senderId) {
+      return res.status(400).json({ error: "receiver_id must be different" });
+    }
+
+    const bookingIdRaw = req.body?.booking_id ?? req.body?.bookingId ?? null;
+    const bookingId = bookingIdRaw == null ? null : Number(bookingIdRaw);
+    if (bookingIdRaw != null && !Number.isFinite(bookingId)) {
+      return res.status(400).json({ error: "Invalid booking_id" });
+    }
+
+    const messageText = String(
+      req.body?.message_text ?? req.body?.messageText ?? req.body?.text ?? ""
+    ).trim();
+    if (!messageText) {
+      return res.status(400).json({ error: "message_text is required" });
+    }
+
+    const messageData = {
+      sender_id: senderId,
+      receiver_id: receiverId,
+      booking_id: bookingId,
+      message_text: messageText,
+    };
+
     const newMessage = await Message.create(messageData);
+
+    // Notifications: message received (local/tourist)
+    try {
+      const receiver = await User.findById(receiverId);
+      const receiverRole = String(receiver?.role || "tourist")
+        .toLowerCase()
+        .trim();
+      const dash =
+        receiverRole === "admin"
+          ? "/admin"
+          : receiverRole === "local" || receiverRole === "guide"
+          ? "/local"
+          : "/dashboard";
+      await Notification.create({
+        user_id: receiverId,
+        type: "message_received",
+        title: "New message",
+        message: "You have received a new message.",
+        link: `${dash}?tab=messages&chat=${senderId}`,
+        metadata: {
+          sender_id: senderId,
+          receiver_id: receiverId,
+          booking_id: bookingId,
+          message_id: newMessage?.message_id,
+        },
+      });
+    } catch {
+      // don't block messaging flow
+    }
+
+    if (pusher) {
+      const conversationId = toConversationId(senderId, receiverId);
+      const channel = `private-chat-${conversationId}`;
+      pusher.trigger(channel, "message:new", {
+        message: newMessage,
+      });
+    }
+
     res.status(201).json(newMessage);
   } catch (error) {
     console.error("Error sending message:", error);
@@ -16,8 +96,20 @@ export const sendMessage = async (req, res) => {
 export const getConversation = async (req, res) => {
   try {
     const { user1Id, user2Id } = req.params;
+    const me = Number(req.user?.user_id);
+    const u1 = Number(user1Id);
+    const u2 = Number(user2Id);
+    const isAdmin = String(req.user?.role || "").toLowerCase() === "admin";
+    if (!isAdmin && me !== u1 && me !== u2) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
     const { bookingId } = req.query;
-    const conversation = await Message.getConversation(user1Id, user2Id, bookingId);
+    const conversation = await Message.getConversation(
+      user1Id,
+      user2Id,
+      bookingId
+    );
     res.status(200).json(conversation);
   } catch (error) {
     console.error("Error fetching conversation:", error);
@@ -29,6 +121,13 @@ export const getConversation = async (req, res) => {
 export const getUserConversations = async (req, res) => {
   try {
     const { userId } = req.params;
+    const me = Number(req.user?.user_id);
+    const target = Number(userId);
+    const isAdmin = String(req.user?.role || "").toLowerCase() === "admin";
+    if (!isAdmin && me !== target) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
     const conversations = await Message.getUserConversations(userId);
     res.status(200).json(conversations);
   } catch (error) {
@@ -41,10 +140,74 @@ export const getUserConversations = async (req, res) => {
 export const markMessageAsRead = async (req, res) => {
   try {
     const { messageId } = req.params;
+    const me = Number(req.user?.user_id);
+    if (!Number.isFinite(me)) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const existing = await Message.findById(messageId);
+    if (!existing) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+
+    const isAdmin = String(req.user?.role || "").toLowerCase() === "admin";
+    if (!isAdmin && Number(existing.receiver_id) !== me) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
     const updatedMessage = await Message.markAsRead(messageId);
+
+    if (pusher && updatedMessage) {
+      const conversationId = toConversationId(
+        updatedMessage.sender_id,
+        updatedMessage.receiver_id
+      );
+      const channel = `private-chat-${conversationId}`;
+      pusher.trigger(channel, "message:read", {
+        message_id: updatedMessage.message_id,
+        read_at: updatedMessage.read_at || new Date().toISOString(),
+        receiver_id: updatedMessage.receiver_id,
+      });
+    }
     res.status(200).json(updatedMessage);
   } catch (error) {
     console.error("Error marking message as read:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ✅ Mark all incoming messages from another user as read
+export const markConversationAsRead = async (req, res) => {
+  try {
+    const me = Number(req.user?.user_id);
+    if (!Number.isFinite(me)) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const otherUserId = Number(req.params?.otherUserId);
+    if (!Number.isFinite(otherUserId)) {
+      return res.status(400).json({ error: "Invalid otherUserId" });
+    }
+    if (otherUserId === me) {
+      return res.status(400).json({ error: "otherUserId must be different" });
+    }
+
+    const updatedRows = await Message.markConversationAsRead(me, otherUserId);
+
+    if (pusher && Array.isArray(updatedRows) && updatedRows.length) {
+      const conversationId = toConversationId(me, otherUserId);
+      const channel = `private-chat-${conversationId}`;
+      // Emit one event with the list of message ids.
+      pusher.trigger(channel, "conversation:read", {
+        reader_id: me,
+        message_ids: updatedRows.map((m) => m.message_id),
+        read_at: updatedRows[updatedRows.length - 1]?.read_at || null,
+      });
+    }
+
+    res.status(200).json({ updated: updatedRows?.length || 0 });
+  } catch (error) {
+    console.error("Error marking conversation as read:", error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -53,6 +216,12 @@ export const markMessageAsRead = async (req, res) => {
 export const getUnreadCount = async (req, res) => {
   try {
     const { userId } = req.params;
+    const me = Number(req.user?.user_id);
+    const target = Number(userId);
+    const isAdmin = String(req.user?.role || "").toLowerCase() === "admin";
+    if (!isAdmin && me !== target) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
     const unreadCount = await Message.getUnreadCount(userId);
     res.status(200).json({ unread_count: unreadCount });
   } catch (error) {

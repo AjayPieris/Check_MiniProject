@@ -28,7 +28,7 @@ export default function Hero() {
         <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
           {/* Explore Tours with animated search icon */}
           <a
-            href="#discover"
+            href="/tours"
             className="inline-flex items-center gap-3 rounded-xl bg-white/95 px-5 py-3 text-base font-semibold text-neutral-800 shadow-md transition hover:bg-white hover:shadow-lg hover:scale-105 transform"
           >
             <svg

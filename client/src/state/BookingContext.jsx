@@ -1,6 +1,116 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
+import api from "../api/client";
 
 const BookingContext = createContext(null);
+
+const FALLBACK_TOUR_IMAGE =
+  "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=60";
+const FALLBACK_GUIDE_AVATAR =
+  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=60";
+
+function coerceArray(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      if (value.includes(",")) {
+        return value
+          .split(",")
+          .map((v) => v.trim())
+          .filter(Boolean);
+      }
+    }
+    return [value];
+  }
+  return [];
+}
+
+function slugify(input) {
+  if (!input) return "";
+  return input
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
+function normalizeBooking(record = {}) {
+  // Already normalized
+  if (record.tour && record.guide) {
+    return {
+      ...record,
+      id: record.id || record.booking_id || record._id || `b_${Date.now()}`,
+    };
+  }
+
+  const images = coerceArray(record.images || record.tour_images);
+  const guideFirst =
+    record.guide_first_name || record.first_name || record.provider_first_name;
+  const guideLast =
+    record.guide_last_name || record.last_name || record.provider_last_name;
+
+  const guideName = [guideFirst, guideLast].filter(Boolean).join(" ").trim();
+  const tourTitle = record.title || record.tour_title;
+  const location =
+    record.location ||
+    record.tour_location ||
+    record.destination ||
+    "Sri Lanka";
+
+  const currencyRaw = record.currency || record.tour?.currency;
+  const currency =
+    String(currencyRaw || "").trim() === "$" || !currencyRaw
+      ? "Rs. "
+      : currencyRaw;
+
+  return {
+    id: record.booking_id || record.id || record._id || `b_${Date.now()}`,
+    date: record.tour_date
+      ? new Date(record.tour_date).toLocaleDateString()
+      : record.date || "",
+    guests: record.group_size || record.guests || 1,
+    total: Number(record.total_amount ?? record.total ?? 0),
+    status: record.status || "pending",
+    tour: {
+      id: record.tour_id || record.tour?.id || record.booking_id,
+      slug:
+        record.slug ||
+        record.tour_slug ||
+        slugify(tourTitle) ||
+        String(record.tour_id || record.booking_id || ""),
+      title: tourTitle || record.tour?.title || "Tour experience",
+      image: record.image || images[0] || FALLBACK_TOUR_IMAGE,
+      location,
+      durationHours: record.duration || record.duration_hours || null,
+      price: Number(
+        record.price ?? record.tour_price ?? record.total_amount ?? 0
+      ),
+      currency,
+    },
+    guide: {
+      id:
+        record.provider_id ||
+        record.guide_id ||
+        record.guide?.id ||
+        `guide_${record.tour_id || record.booking_id}`,
+      name: guideName || record.guide?.name || "Guide",
+      avatar:
+        record.guide_avatar || record.guide?.avatar || FALLBACK_GUIDE_AVATAR,
+      verified:
+        record.badge_status === "approved" || record.guide?.verified || false,
+    },
+  };
+}
 
 // Booking shape
 // {
@@ -16,56 +126,94 @@ const BookingContext = createContext(null);
 export function BookingProvider({ children }) {
   const [bookings, setBookings] = useState([]);
   const [messages, setMessages] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const createBooking = ({ tour, guide, date, guests }) => {
-    const total = Number(tour.price || 0) * Math.max(1, Number(guests || 1));
+  const createBooking = async ({
+    tour,
+    guide,
+    date,
+    guests,
+    specialRequests,
+  } = {}) => {
+    const tourIdRaw = tour?.id ?? tour?.tour_id ?? tour?.slug;
+    const tourId = Number(tourIdRaw);
+    const groupSize = Math.max(1, Number(guests || 1));
+
+    // If this is a real DB tour id, create a real booking on the server.
+    if (Number.isFinite(tourId)) {
+      const created = await api.post("/bookings", {
+        tour_id: tourId,
+        tour_date: date,
+        group_size: groupSize,
+        special_requests: specialRequests,
+      });
+      const normalized = normalizeBooking(created);
+      setBookings((prev) => [normalized, ...prev]);
+      return normalized;
+    }
+
+    // Fallback: demo booking for mock tours.
+    const total = Number(tour?.price || 0) * groupSize;
     const booking = {
       id: `b_${Date.now()}`,
       tour: {
-        id: tour.id ?? tour.slug ?? String(Date.now()),
-        slug: tour.slug,
-        title: tour.title,
-        image: tour.image,
-        location: tour.location,
-        durationHours: tour.durationHours,
-        price: tour.price,
-        currency: tour.currency || "$",
+        id: tour?.id ?? tour?.slug ?? String(Date.now()),
+        slug: tour?.slug,
+        title: tour?.title,
+        image: tour?.image,
+        location: tour?.location,
+        durationHours: tour?.durationHours,
+        price: tour?.price,
+        currency:
+          String(tour?.currency || "").trim() === "$" || !tour?.currency
+            ? "Rs. "
+            : tour.currency,
       },
       guide,
       date,
-      guests,
+      guests: groupSize,
       total,
       status: "pending",
       createdAt: new Date().toISOString(),
     };
+
     setBookings((prev) => [booking, ...prev]);
-
-    // Seed a system-style message thread with the guide for this booking
-    setMessages((prev) => {
-      const thread = prev[guide.id] ?? [];
-      return {
-        ...prev,
-        [guide.id]: [
-          ...thread,
-          {
-            id: `m_${Date.now()}`,
-            guideId: guide.id,
-            sender: "guide",
-            text:
-              "Thanks for your request! I’ll review and approve shortly. Feel free to send any questions here.",
-            createdAt: new Date().toISOString(),
-          },
-        ],
-      };
-    });
-
+    if (guide?.id) {
+      setMessages((prev) => {
+        const thread = prev[guide.id] ?? [];
+        return {
+          ...prev,
+          [guide.id]: [
+            ...thread,
+            {
+              id: `m_${Date.now()}`,
+              guideId: guide.id,
+              sender: "guide",
+              text: "Thanks for your request! I’ll review and approve shortly. Feel free to send any questions here.",
+              createdAt: new Date().toISOString(),
+            },
+          ],
+        };
+      });
+    }
     return booking;
   };
 
-  const updateBookingStatus = (bookingId, status) => {
-    setBookings((prev) =>
-      prev.map((b) => (b.id === bookingId ? { ...b, status } : b))
-    );
+  const updateBookingStatus = async (bookingId, status) => {
+    try {
+      const updated = await api.patch(`/bookings/${bookingId}/status`, {
+        status,
+      });
+      const normalized = normalizeBooking(updated);
+      const normalizedId = normalized.id || bookingId;
+      setBookings((prev) =>
+        prev.map((b) => (b.id === normalizedId ? { ...b, ...normalized } : b))
+      );
+    } catch (err) {
+      console.error("Failed to sync booking status", err);
+      throw err;
+    }
   };
 
   const sendMessage = ({ guideId, sender, text }) => {
@@ -87,6 +235,35 @@ export function BookingProvider({ children }) {
     });
   };
 
+  const loadBookings = useCallback(
+    async ({ userId, role = "tourist" } = {}) => {
+      if (!userId) return [];
+      setLoading(true);
+      setError(null);
+      try {
+        const normalizedRole = (role || "tourist").toString().toLowerCase();
+        const path =
+          normalizedRole === "provider" || normalizedRole === "local"
+            ? `/bookings/provider/${encodeURIComponent(userId)}`
+            : `/bookings/tourist/${encodeURIComponent(userId)}`;
+        const data = await api.get(path);
+        const normalized = Array.isArray(data)
+          ? data.map((record) => normalizeBooking(record))
+          : [];
+        setBookings(normalized);
+        return normalized;
+      } catch (err) {
+        console.error("Failed to load bookings", err);
+        setError(err.message || "Unable to load bookings");
+        setBookings([]);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
   const value = useMemo(
     () => ({
       bookings,
@@ -94,11 +271,16 @@ export function BookingProvider({ children }) {
       createBooking,
       updateBookingStatus,
       sendMessage,
+      loadBookings,
+      loading,
+      error,
     }),
-    [bookings, messages]
+    [bookings, messages, loading, error, loadBookings]
   );
 
-  return <BookingContext.Provider value={value}>{children}</BookingContext.Provider>;
+  return (
+    <BookingContext.Provider value={value}>{children}</BookingContext.Provider>
+  );
 }
 
 export function useBooking() {
