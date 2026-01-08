@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { getCloudinarySignature } from "../../api1/uploads";
 import { generateDescription } from "../../api/ai";
+import { SRI_LANKA_DISTRICTS } from "../../data/districts";
 
 export default function TourFormModal({ open, onClose, onSave, initial }) {
   // State
@@ -451,11 +452,18 @@ export default function TourFormModal({ open, onClose, onSave, initial }) {
                   <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-300">
                     District
                   </label>
-                  <input
+                  <select
                     value={form.location}
                     onChange={(e) => set("location", e.target.value)}
-                    className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-800 outline-none placeholder:text-neutral-400 focus:ring-2 focus:ring-teal-400/30 dark:border-neutral-800 dark:bg-black dark:text-neutral-200 dark:placeholder:text-neutral-500"
-                  />
+                    className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-800 outline-none focus:ring-2 focus:ring-teal-400/30 dark:border-neutral-800 dark:bg-black dark:text-neutral-200"
+                  >
+                    <option value="">Select district</option>
+                    {SRI_LANKA_DISTRICTS.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-300">
@@ -467,12 +475,12 @@ export default function TourFormModal({ open, onClose, onSave, initial }) {
                     className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-800 outline-none focus:ring-2 focus:ring-teal-400/30 dark:border-neutral-800 dark:bg-black dark:text-neutral-200"
                   >
                     <option value="">Select a category</option>
-                    <option value="cultural">cultural</option>
-                    <option value="eco">eco</option>
-                    <option value="food">food</option>
-                    <option value="adventure">adventure</option>
-                    <option value="historical">historical</option>
-                    <option value="wellness">wellness</option>
+                    <option value="Accommodation">Accommodation</option>
+                    <option value="Transportation">Transportation</option>
+                    <option value="Food">Food</option>
+                    <option value="Guide">Guide</option>
+                    <option value="Activity">Activity</option>
+                    <option value="Equipment">Equipment</option>
                   </select>
                 </div>
                 <div>

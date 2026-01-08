@@ -34,6 +34,15 @@ function buildPrompt(payload) {
   const endDate = clampText(payload?.endDate, 20);
   const time = clampText(payload?.time, 40);
 
+  const themeHint = (() => {
+    const combined = `${title} ${eventCategory} ${existing}`.trim();
+    if (!combined) return "";
+    if (/\b(christmas|xmas)\b/i.test(combined))
+      return "Christmas / holiday celebration";
+    if (/\bnew\s*year\b/i.test(combined)) return "New Year celebration";
+    return "";
+  })();
+
   const baseRules =
     "Write a natural, friendly description for a Sri Lanka travel app. " +
     "Output ONLY the description text (no title, no bullets, no markdown). " +
@@ -44,13 +53,18 @@ function buildPrompt(payload) {
   if (kind === "event") {
     return (
       `${baseRules}\n` +
-      "Make it 60–90 words as 3–4 complete sentences (NOT less than 60 words). " +
-      "Mention the event name naturally once, describe what people will see/experience, and why it's special.\n" +
+      "Make it 90–130 words as 4–6 complete sentences (NOT less than 90 words). " +
+      "First sentence MUST include the event name (do not start with a generic travel intro). " +
+      "Do NOT write generic copy like 'Welcome to Sri Lanka' and do NOT mention our app/this app. " +
+      "Describe what people will see/experience, the vibe, and who it suits. " +
+      "Include practical context using ONLY the provided details (location, category, dates, time). " +
+      "If any detail is missing, stay general instead of inventing specifics.\n" +
       `Event name: ${title || "(not provided)"}.\n` +
       `Location/District: ${location || "(not provided)"}.\n` +
       `Category: ${eventCategory || "(not provided)"}.\n` +
       `Dates: ${startDate || "?"} to ${endDate || "?"}.\n` +
       `Time: ${time || "(not provided)"}.\n` +
+      (themeHint ? `Theme hint: ${themeHint}.\n` : "") +
       (existing
         ? `Existing description (improve if provided): ${existing}.\n`
         : "") +
@@ -95,7 +109,7 @@ function getGenerationConfig(kind) {
   if (kind === "event") {
     return {
       temperature: 0.6,
-      maxOutputTokens: 520,
+      maxOutputTokens: 720,
     };
   }
   return {
@@ -184,6 +198,22 @@ function extractGeminiText(json) {
   return text;
 }
 
+function normalizeUserMessage(text) {
+  const s = String(text || "").trim();
+  if (!s) return "";
+
+  // If the whole message is just a greeting, keep it as-is.
+  if (/^(hi|hello|hey)(\s+there)?[!.?]*$/i.test(s)) return s;
+
+  // If user appends a greeting to a real question (e.g. "suggest tours hi"),
+  // remove the trailing greeting token so it doesn't hijack the reply.
+  const stripped = s
+    .replace(/(?:[\s,]+)(hi|hello|hey)(\s+there)?[!.?]*\s*$/i, "")
+    .trim();
+
+  return stripped || s;
+}
+
 function normalizeChatMessages(input) {
   const raw = Array.isArray(input?.messages)
     ? input.messages
@@ -195,7 +225,12 @@ function normalizeChatMessages(input) {
     .filter(Boolean)
     .map((m) => ({
       role: String(m?.role || "user").toLowerCase(),
-      content: clampText(m?.content, 800),
+      content: clampText(
+        String(m?.role || "user").toLowerCase() === "user"
+          ? normalizeUserMessage(m?.content)
+          : m?.content,
+        800
+      ),
     }))
     .filter((m) => (m.role === "user" || m.role === "assistant") && m.content);
 
@@ -208,6 +243,8 @@ function buildChatPrompt(messages) {
     "Reply like a helpful friend in simple English. " +
     "Keep it short and easy: 2–6 sentences (or up to 2 short paragraphs). " +
     "If the user's request is unclear, ask 1 quick follow-up question. " +
+    "If the user includes a greeting along with a real question/request, answer the request (do not reply with only a greeting). " +
+    "Only give a greeting-only response when the user's latest message is just a greeting (like 'hi'/'hello'/'hey'). " +
     "Do NOT use markdown formatting (no **, no *, no backticks). " +
     "Do not invent exact prices, guarantees, or specific facts not provided. Avoid emojis.";
 
@@ -266,10 +303,10 @@ export const generateDescription = async (req, res) => {
     }
 
     // If event output is too short, retry once with a stronger instruction.
-    if (kind === "event" && countWords(text) < 60) {
+    if (kind === "event" && countWords(text) < 90) {
       const retryPrompt =
         prompt +
-        "\nIMPORTANT: Your previous answer was too short or incomplete. Rewrite it to be 60–90 words (NOT less than 60) as 3–4 complete sentences, and do not use fragments like 'where ...'.";
+        "\nIMPORTANT: Your previous answer was too short or incomplete. Rewrite it to be 90–130 words (NOT less than 90) as 4–6 complete sentences, and do not use fragments like 'where ...'.";
       const retry = await callGemini({
         url,
         prompt: retryPrompt,
@@ -289,7 +326,7 @@ export const generateDescription = async (req, res) => {
         : ensureCompleteSentences(text);
     const normalized =
       kind === "event"
-        ? trimToMaxWordsAtSentenceBoundary(safeText, 95)
+        ? trimToMaxWordsAtSentenceBoundary(safeText, 140)
         : safeText;
     const description = clampText(normalized, kind === "event" ? 1200 : 1000);
     return res.json({ description });

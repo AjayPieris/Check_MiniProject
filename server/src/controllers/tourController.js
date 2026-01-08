@@ -15,9 +15,17 @@ const toTrimmedStringOrUndefined = (value) => {
 };
 
 const ALLOWED_CATEGORIES = new Set([
+  // New UI categories (client sends capitalized values; we lowercase in normalizeTourPayload)
+  "accommodation",
+  "transportation",
+  "food",
+  "guide",
+  "activity",
+  "equipment",
+
+  // Legacy categories (kept for backwards compatibility)
   "cultural",
   "eco",
-  "food",
   "adventure",
   "historical",
   "wellness",
@@ -175,6 +183,11 @@ export const getToursByProvider = async (req, res) => {
 export const updateTour = async (req, res) => {
   try {
     const payload = normalizeTourPayload(req.body);
+
+    if (payload.category && !ALLOWED_CATEGORIES.has(payload.category)) {
+      return res.status(400).json({ error: "Invalid category" });
+    }
+
     // Remove undefined keys so Tour.update won't attempt to set invalid values
     const cleaned = Object.fromEntries(
       Object.entries(payload).filter(([, v]) => v !== undefined)

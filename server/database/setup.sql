@@ -24,7 +24,10 @@ CREATE TABLE IF NOT EXISTS tours (
     duration_hours INTEGER,
     location VARCHAR(255) NOT NULL,
     district VARCHAR(100),
-    category VARCHAR(50) CHECK (category IN ('cultural', 'eco', 'food', 'adventure', 'historical', 'wellness')),
+    category VARCHAR(50) CHECK (category IN (
+        'accommodation', 'transportation', 'food', 'guide', 'activity', 'equipment',
+        'cultural', 'eco', 'adventure', 'historical', 'wellness'
+    )),
     max_group_size INTEGER DEFAULT 10,
     images TEXT[],
     itinerary JSONB,

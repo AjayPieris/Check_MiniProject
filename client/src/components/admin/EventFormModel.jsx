@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../../api/client";
 import { generateDescription } from "../../api/ai";
+import { SRI_LANKA_DISTRICTS } from "../../data/districts";
 
 export default function EventFormModal({ open, onClose, onSave, initial }) {
   const [form, setForm] = useState({
@@ -187,11 +188,18 @@ export default function EventFormModal({ open, onClose, onSave, initial }) {
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-300">
               District
             </label>
-            <input
+            <select
               value={form.location}
               onChange={(e) => set("location", e.target.value)}
               className="w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-sm dark:border-neutral-800 dark:bg-black dark:text-neutral-200"
-            />
+            >
+              <option value="">Select district</option>
+              {SRI_LANKA_DISTRICTS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-300">
