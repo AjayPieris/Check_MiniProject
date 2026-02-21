@@ -39,14 +39,14 @@ export default function BadgeRequestsPanel() {
     try {
       // Normalize in API; still guard here
       const list = await getAllBadgeRequests(
-        filter !== "all" ? filter : undefined
+        filter !== "all" ? filter : undefined,
       );
       setRequests(Array.isArray(list) ? list : []);
       const pendingList = await getAllBadgeRequests("pending");
       setPendingCount(
         Array.isArray(pendingList)
           ? pendingList.length
-          : Number(pendingList?.count || 0)
+          : Number(pendingList?.count || 0),
       );
     } catch (e) {
       console.error(e);
@@ -144,6 +144,36 @@ export default function BadgeRequestsPanel() {
                         ? new Date(submittedAt).toLocaleDateString()
                         : "-"}
                     </div>
+                    {Array.isArray(r.document_urls) &&
+                      r.document_urls.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {r.document_urls.map((url, i) => (
+                            <a
+                              key={i}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
+                            >
+                              <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                <polyline points="15 3 21 3 21 9" />
+                                <line x1="10" y1="14" x2="21" y2="3" />
+                              </svg>
+                              Document {i + 1}
+                            </a>
+                          ))}
+                        </div>
+                      )}
                   </div>
                   <StatusChip status={r.status || "pending"} />
                   <div className="flex gap-2">
