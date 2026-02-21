@@ -53,6 +53,7 @@ export const toExperienceItem = (t) => {
       count: Number(t?.rating?.count ?? t?.rating_count ?? 0),
     },
     guide: {
+      id: t?.provider_id ?? t?.guide?.id ?? null,
       name: t?.guide?.name || guideName,
       avatar:
         t?.guide?.avatar ||
@@ -66,7 +67,7 @@ export const toExperienceItem = (t) => {
 
 export const getToursByProvider = async (providerId) => {
   const res = await api.get(
-    `/tours/provider/${encodeURIComponent(providerId)}`
+    `/tours/provider/${encodeURIComponent(providerId)}`,
   );
   return normalizeList(res);
 };

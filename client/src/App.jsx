@@ -12,6 +12,7 @@ import AdminDashboard from "./pages/AdminDashboard.jsx";
 import LocalDashboard from "./pages/LocalDashboard.jsx";
 import HelpCenter from "./pages/HelpCenter.jsx";
 import Account from "./pages/Account.jsx";
+import GuideProfile from "./pages/GuideProfile.jsx";
 import { AuthProvider } from "./state/AuthContext";
 import { BookingProvider } from "./state/BookingContext";
 
@@ -34,6 +35,8 @@ export default function App() {
           <Route path="/account" element={<Account />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/local" element={<LocalDashboard />} />
+
+          <Route path="/guides/:id" element={<GuideProfile />} />
 
           <Route path="/help" element={<HelpCenter />} />
           <Route path="/help-center" element={<HelpCenter />} />

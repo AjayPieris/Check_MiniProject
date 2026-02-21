@@ -150,7 +150,7 @@ function Gallery({ main, extras }) {
   const [active, setActive] = useState(main);
   const images = useMemo(
     () => [main, ...extras].filter(Boolean),
-    [main, extras]
+    [main, extras],
   );
   return (
     <section className="mx-auto max-w-6xl px-4 -mt-10 relative">
@@ -233,12 +233,18 @@ function GuideCard({ guide }) {
         </p>
       </div>
       <div className="ml-auto">
-        <Link
-          to="/guides"
-          className="text-sm font-semibold text-orange-600 hover:underline"
-        >
-          View profile
-        </Link>
+        {guide.id ? (
+          <Link
+            to={`/guides/${guide.id}`}
+            className="text-sm font-semibold text-orange-600 hover:underline"
+          >
+            View profile
+          </Link>
+        ) : (
+          <span className="text-sm text-neutral-400 dark:text-neutral-500">
+            Local Guide
+          </span>
+        )}
       </div>
     </div>
   );
@@ -249,7 +255,7 @@ export default function TourDetails() {
   const { user } = useAuth();
   const mockItem = useMemo(
     () => EXPERIENCES_MOCK.find((i) => i.slug === slug),
-    [slug]
+    [slug],
   );
   const [item, setItem] = useState(mockItem || null);
   const [backendTour, setBackendTour] = useState(null);
@@ -488,7 +494,7 @@ export default function TourDetails() {
 
   // Related tours (same category, excluding current)
   const related = EXPERIENCES_MOCK.filter(
-    (x) => x.category === item.category && x.id !== item.id
+    (x) => x.category === item.category && x.id !== item.id,
   );
 
   return (
