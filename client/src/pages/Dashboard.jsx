@@ -28,6 +28,7 @@ export default function Dashboard() {
     error: bookingsError,
   } = useBooking();
   const [tab, setTab] = useState("bookings");
+  const [pendingChatGuide, setPendingChatGuide] = useState(null);
   const { user, setUser, initializing } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -188,10 +189,8 @@ export default function Dashboard() {
                       key={b.id}
                       booking={b}
                       onMessage={(bkg) => {
+                        setPendingChatGuide(bkg.guide);
                         setTab("messages");
-                        navigate(`/dashboard?chat=${bkg.guide.id}`, {
-                          replace: true,
-                        });
                       }}
                     />
                   ))}
@@ -203,8 +202,13 @@ export default function Dashboard() {
             <div className="mt-6">
               <ChatPanel
                 initialGuideId={
-                  new URLSearchParams(location.search).get("chat") || undefined
+                  (pendingChatGuide?.id != null
+                    ? String(pendingChatGuide.id)
+                    : null) ||
+                  new URLSearchParams(location.search).get("chat") ||
+                  undefined
                 }
+                initialGuideInfo={pendingChatGuide || undefined}
               />
             </div>
           )}

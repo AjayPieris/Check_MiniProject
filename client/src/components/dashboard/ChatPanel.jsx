@@ -42,7 +42,7 @@ function getToken() {
   );
 }
 
-export default function ChatPanel({ initialGuideId }) {
+export default function ChatPanel({ initialGuideId, initialGuideInfo }) {
   const { user } = useAuth();
   const myId = user?.id;
   const myRole = (user?.role || "").toString().toLowerCase();
@@ -76,13 +76,33 @@ export default function ChatPanel({ initialGuideId }) {
   useEffect(() => {
     if (!myId) return;
     if (initialGuideId) {
-      setActiveUserId(initialGuideId);
+      setActiveUserId(String(initialGuideId));
       return;
     }
     if (!activeChatStorageKey) return;
     const saved = localStorage.getItem(activeChatStorageKey);
     if (saved) setActiveUserId(saved);
   }, [myId, initialGuideId, activeChatStorageKey]);
+
+  // Seed the incoming guide into the contacts list immediately so the
+  // sidebar and chat header show the correct name before the async load.
+  useEffect(() => {
+    if (!initialGuideId || !initialGuideInfo) return;
+    setContacts((prev) => {
+      const key = String(initialGuideInfo.id ?? initialGuideId);
+      if (prev.some((c) => String(c.id) === key)) return prev;
+      return [
+        {
+          id: initialGuideInfo.id ?? initialGuideId,
+          name: initialGuideInfo.name || "Guide",
+          avatar: initialGuideInfo.avatar || FALLBACK_AVATAR,
+          role: "local",
+          lastMessage: "",
+        },
+        ...prev,
+      ];
+    });
+  }, [initialGuideId, initialGuideInfo]);
 
   // Persist active conversation.
   useEffect(() => {
@@ -150,12 +170,18 @@ export default function ChatPanel({ initialGuideId }) {
         const merged = new Map();
         bookingContacts.forEach((c) => merged.set(String(c.id), c));
         convList.forEach((c) =>
-          merged.set(String(c.id), { ...merged.get(String(c.id)), ...c })
+          merged.set(String(c.id), { ...merged.get(String(c.id)), ...c }),
         );
 
         const out = Array.from(merged.values());
         if (mounted) {
-          setContacts(out);
+          setContacts((prev) => {
+            // Keep any guide that was seeded via initialGuideInfo and not yet
+            // in the fetched list, then merge in the fresh data.
+            const freshIds = new Set(out.map((c) => String(c.id)));
+            const seeded = prev.filter((c) => !freshIds.has(String(c.id)));
+            return [...seeded, ...out];
+          });
           if (!activeUserId) setActiveUserId(out[0]?.id ?? null);
         }
       } finally {
@@ -181,14 +207,14 @@ export default function ChatPanel({ initialGuideId }) {
         setThread(
           normalizeList(msgs).map((m) => ({
             id: String(
-              m.message_id ?? `${m.sender_id}_${m.receiver_id}_${m.created_at}`
+              m.message_id ?? `${m.sender_id}_${m.receiver_id}_${m.created_at}`,
             ),
             senderId: m.sender_id,
             text: m.message_text,
             createdAt: m.created_at,
             isRead: Boolean(m.is_read),
             readAt: m.read_at || null,
-          }))
+          })),
         );
 
         // Mark incoming messages as read when opening the thread.
@@ -290,7 +316,7 @@ export default function ChatPanel({ initialGuideId }) {
       setThread((prev) => {
         const id = String(
           msg.message_id ??
-            `${msg.sender_id}_${msg.receiver_id}_${msg.created_at}`
+            `${msg.sender_id}_${msg.receiver_id}_${msg.created_at}`,
         );
         if (prev.some((m) => m.id === id)) return prev;
         return [
@@ -320,8 +346,8 @@ export default function ChatPanel({ initialGuideId }) {
         prev.map((m) =>
           m.id === String(messageId)
             ? { ...m, isRead: true, readAt: readAt || m.readAt }
-            : m
-        )
+            : m,
+        ),
       );
     });
 
@@ -333,8 +359,8 @@ export default function ChatPanel({ initialGuideId }) {
       const readAt = payload?.read_at || null;
       setThread((prev) =>
         prev.map((m) =>
-          ids.includes(String(m.id)) ? { ...m, isRead: true, readAt } : m
-        )
+          ids.includes(String(m.id)) ? { ...m, isRead: true, readAt } : m,
+        ),
       );
     });
 

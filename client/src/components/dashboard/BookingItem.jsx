@@ -26,10 +26,10 @@ export default function BookingItem({ booking, onMessage }) {
     status === "confirmed"
       ? { label: "confirmed", color: "green" }
       : status === "completed"
-      ? { label: "completed", color: "teal" }
-      : status === "cancelled"
-      ? { label: "cancelled", color: "rose" }
-      : { label: "pending approval", color: "amber" };
+        ? { label: "completed", color: "teal" }
+        : status === "cancelled"
+          ? { label: "cancelled", color: "rose" }
+          : { label: "pending approval", color: "amber" };
 
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm md:flex-row md:items-center dark:border-neutral-800 dark:bg-black">
@@ -139,7 +139,7 @@ export default function BookingItem({ booking, onMessage }) {
             Contact Guide
           </button>
           <a
-            href={`/tours/${booking.tour.slug}`}
+            href={`/tours/${booking.tour.id || booking.tour.slug}`}
             className="inline-flex items-center gap-2 rounded-xl border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-900"
           >
             View Details
