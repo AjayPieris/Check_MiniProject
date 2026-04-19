@@ -1,14 +1,15 @@
 import { api, normalizeList } from "./client";
+import { EXPERIENCES_MOCK } from "../data/experiences.mock";
 
 export const createTour = (data) => api.post("/tours", data);
 
 export const getAllTours = async () => {
-  const res = await api.get("/tours");
-  return normalizeList(res);
+  return EXPERIENCES_MOCK;
 };
 
 export const getTourById = async (id) => {
-  return api.get(`/tours/${encodeURIComponent(id)}`);
+  const tour = EXPERIENCES_MOCK.find((e) => String(e.id) === String(id));
+  return tour || null;
 };
 
 const DEFAULT_TOUR_IMAGE = "https://via.placeholder.com/800x400?text=Tour";
@@ -66,10 +67,9 @@ export const toExperienceItem = (t) => {
 };
 
 export const getToursByProvider = async (providerId) => {
-  const res = await api.get(
-    `/tours/provider/${encodeURIComponent(providerId)}`,
+  return EXPERIENCES_MOCK.filter(
+    (t) => String(t.guide?.id) === String(providerId),
   );
-  return normalizeList(res);
 };
 
 export const updateTour = (id, data) => api.put(`/tours/${id}`, data);

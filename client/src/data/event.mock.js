@@ -22,8 +22,7 @@ export const EVENTS_MOCK = [
     startDate: "2025-08-15",
     type: "Cultural Festival",
     time: "19:00",
-    image:
-      "https://images.unsplash.com/photo-1532465614-41b5f9928093?q=80&w=1200&auto=format&fit=crop",
+    image: "/events/event1.jpg",
   },
   {
     id: 2,
@@ -35,8 +34,7 @@ export const EVENTS_MOCK = [
     startDate: "2025-01-20",
     type: "Cultural Festival",
     time: "10:00",
-    image:
-      "https://images.unsplash.com/photo-1562077773-9a684e0b01ae?q=80&w=1200&auto=format&fit=crop",
+    image: "/events/event2.webp",
   },
   {
     id: 3,
@@ -48,8 +46,7 @@ export const EVENTS_MOCK = [
     startDate: "2025-04-10",
     type: "Cultural Festival",
     time: "08:30",
-    image:
-      "https://images.unsplash.com/photo-1584289830568-91414b9d21b9?q=80&w=1200&auto=format&fit=crop",
+    image: "/events/event1.jpg",
   },
   {
     id: 4,
@@ -61,7 +58,6 @@ export const EVENTS_MOCK = [
     startDate: "2025-07-05",
     type: "Cultural Festival",
     time: "18:00",
-    image:
-      "https://images.unsplash.com/photo-1555243896-c709bfa0b564?q=80&w=1200&auto=format&fit=crop",
+    image: "/events/event2.webp",
   },
 ];

@@ -1,4 +1,5 @@
 import { api } from "./client";
+import { EVENTS_MOCK } from "../data/event.mock";
 
 const toClientEvent = (row) => {
   if (!row || typeof row !== "object") return row;
@@ -38,12 +39,11 @@ export const createEvent = async (data) =>
   toClientEvent(await api.post("/events", toServerEventPayload(data)));
 
 export const getAllEvents = async () => {
-  const list = await api.get("/events");
-  return Array.isArray(list) ? list.map(toClientEvent) : [];
+  return EVENTS_MOCK;
 };
 
 export const getEventById = async (id) =>
-  toClientEvent(await api.get(`/events/${id}`));
+  EVENTS_MOCK.find((e) => String(e.id) === String(id)) || null;
 
 export const updateEvent = async (id, data) =>
   api.put(`/events/${id}`, toServerEventPayload(data));
